@@ -1,0 +1,28 @@
+;; This buffer is for text that is not saved, and for Lisp evaluation.
+;; To create a file, visit it with C-x C-f and enter text in its buffer.
+
+
+  EdgePairPair *head = &edge_pairs[0];
+  while (head != NULL && edge_pairs_len > 0) {
+    Vector2 *next_vector = NULL;
+    for (EdgePairPair *current_pair = head->next;
+	 current_pair != NULL;
+	 current_pair = current_pair->next) {
+      if (Vector2Equals(head->b1, current_pair->a1)) {
+	next_vector = &current_pair->b1;
+	head = current_pair;
+	break;
+      } else if (Vector2Equals(head->b1, current_pair->a2)) {
+	next_vector = &current_pair->b2;
+	head = current_pair;
+	break;
+      }
+    }
+
+    if (next_vector) {
+      push(head->a1, manifold);
+      push(head->b1, manifold);
+      push(*next_vector, manifold);
+    }
+    head = head->next;
+  }
