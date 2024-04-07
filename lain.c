@@ -29,20 +29,17 @@ typedef struct Polygon {
   SemanticArrayArgs(Vector2, points, 1 << 8);
 } Polygon;
 
-typedef struct EdgePairPair EdgePairPair;
-struct EdgePairPair {
+typedef struct EdgeNode EdgeNode;
+struct EdgeNode {
   Vector2 a1;
   Vector2 b1;
-  Vector2 a2;
-  Vector2 b2;
-  EdgePairPair *prev;
-  EdgePairPair *next;
+  EdgeNode *prev;
+  EdgeNode *next;
 };
 
 SemanticArray(Polygon, polygons, 1<<8);
 SemanticArray(Vector2, edge_points, 1<<16);
-SemanticArray(EdgePairPair, edge_pairs, 1<<16);
-SemanticArray(Vector2, manifold, 1<<8);
+SemanticArray(EdgeNode, edge_pairs, 1<<16);
 SemanticArray(Vector2, grid_deltas, 1<<16);
 
 Rectangle finish_rect = {0};
@@ -234,16 +231,14 @@ main(void)
 #undef point_for
 
 	if (edge_points_len - edge_points_prelen >= 2) {
-	  EdgePairPair first_pair = {0};
+	  EdgeNode first_pair = {0};
 	  first_pair.a1 = edge_points[edge_points_len - 2];
 	  first_pair.b1 = edge_points[edge_points_len - 1];
-	  first_pair.a2 = first_pair.b1;
-	  first_pair.b2 = first_pair.a1;
 
-	  EdgePairPair *next_empty = next_empty_in_arr(edge_pairs);
+	  EdgeNode *next_empty = next_empty_in_arr(edge_pairs);
 	  *next_empty = first_pair;
 	  next_empty->next = &edge_pairs[0];
-	  next_empty->prev = &edge_pairs[max(0, edge_pairs_len - 1)];
+	  next_empty->prev = &edge_pairs[max(0, edge_pairs_len - 2)];
 	  (next_empty->next)->prev = next_empty;
 	  (next_empty->prev)->next = next_empty;
 
@@ -254,10 +249,10 @@ main(void)
       }
     }
 
-    EdgePairPair *start_pair = &edge_pairs[0];
+    EdgeNode *start_pair = &edge_pairs[0];
     Vector2 query = start_pair->a1;
     while (edge_pairs_len > 0) {
-      for (EdgePairPair *current_pair = start_pair->next;
+      for (EdgeNode *current_pair = start_pair->next;
 	   ;
 	   current_pair = current_pair->next) {
 	if (current_pair == start_pair) {
@@ -265,17 +260,19 @@ main(void)
 	  (start_pair->prev)->next = start_pair->next;
 	  (start_pair->next)->prev = start_pair->prev;
 	  start_pair = current_pair->next;
+	  current_pair = start_pair->next;
 	  edge_pairs_len -= 1;
+	  query = current_pair->a1;
 	  break;
 	}
 	int equal_a = Vector2Equals(query, current_pair->a1);
-	int equal_b = Vector2Equals(query, current_pair->a2);
+	int equal_b = Vector2Equals(query, current_pair->b1);
 	if (equal_a || equal_b) {
 	  push(query, manifold);
 	  if (equal_a) {
 	    query = current_pair->b1;
 	  } else if (equal_b) {
-	    query = current_pair->b2;
+	    query = current_pair->a1;
 	  }
 	  (start_pair->prev)->next = start_pair->next;
 	  (start_pair->next)->prev = start_pair->prev;
@@ -313,12 +310,5 @@ main(void)
     DrawRectangleRec(finish_rect, finish_rect_hot ? RED : BLUE);
 
     EndDrawing();
-
-#ifdef DEBUG
-    if (manifold_len > 2) {
-      asm ("int3; nop");
-    }
-#endif
-
   }
 }
