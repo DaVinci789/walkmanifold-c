@@ -4,7 +4,7 @@ CC = gcc
 CFLAGS = -Iinclude -Llib -g -fsanitize=undefined -fsanitize=address -Wl,-rpath=lib
 
 ifeq ($(OS), Windows_NT)
-	CFLAGS = -msse2 -Iinclude -Llib/windows -lole32 -lcomctl32 -lcomdlg32 -loleaut32 -luuid -lpthread -lopengl32 -lgdi32 -lwinmm -lm
+	CFLAGS = -msse2 -Iinclude -Llib/windows -g -lole32 -lcomctl32 -lcomdlg32 -loleaut32 -luuid -lpthread -lopengl32 -lgdi32 -lwinmm -lm
 else
 	UNAME_S := $(shell uname -s)
 	ifeq ($(UNAME_S), Darwin)

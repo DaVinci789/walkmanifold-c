@@ -5,23 +5,33 @@
 #include <string.h>
 #include <stdio.h>
 
-// #define DEBUG
+//#define DEBUG
 
 #define max(a, b) (a) < (b) ? (b) : (a)
-#define next_empty_n(buf, len, cap, n) (*(len) < cap - n ? (*(len) += n, buf + (*(len) - n)) : 0)
 
+#define next_empty_n(buf, len, cap, n) (*(len) < cap - n ? (*(len) += n, buf + (*(len) - n)) : 0)
 #define next_empty(buf, len, cap) next_empty_n(buf, len, cap, 1)
 #define next_empty_in_arr(a) next_empty_n(a, &a##_len, a##_cap, 1)
 #define push_arr(elm, a, len, cap) *next_empty(a, len, cap) = elm
 #define push(elm, a) push_arr(elm, a, &a##_len, a##_cap)
 #define SemanticArray(type, name, cap)		\
-  type name[cap] = {0}; \
   int name##_len = 0; \
-  int name##_cap = cap
+  int name##_cap = cap; \
+  type name[cap]
 #define SemanticArrayArgs(type, name, cap)		\
   type name[cap]; \
   int name##_len; \
   int name##_cap
+
+SemanticArray(Color, RAINBOW, 7) = {
+  RED,
+  ORANGE,
+  YELLOW,
+  GREEN,
+  BLUE,
+  DARKPURPLE,
+  VIOLET,
+};
 
 int GRIDSIZE = 64;
 
@@ -37,10 +47,16 @@ struct EdgeNode {
   EdgeNode *next;
 };
 
-SemanticArray(Polygon, polygons, 1<<8);
-SemanticArray(Vector2, edge_points, 1<<16);
-SemanticArray(EdgeNode, edge_pairs, 1<<16);
-SemanticArray(Vector2, grid_deltas, 1<<16);
+SemanticArray(Polygon, polygons, 1<<8) = {0};
+SemanticArray(Vector2, edge_points, 1<<16) = {0};
+SemanticArray(EdgeNode, edge_pairs, 1<<16) = {0};
+SemanticArray(Vector2, grid_deltas, 1<<16) = {0};
+
+typedef struct Vector2Group {
+  int group;
+  Vector2 v;
+} Vector2Group;
+SemanticArray(Vector2Group, manifolds, 1<<8) = {0};
 
 Rectangle finish_rect = {0};
 int hot_polygon = 0;
@@ -110,7 +126,10 @@ main(void)
     edge_points_len = 0;
     edge_pairs_len = 0;
     grid_deltas_len = 0;
-    manifold_len = 0;
+    manifolds_len = 0;
+#ifdef DEBUG
+    memset(manifolds, 0, manifolds_len);
+#endif
     finish_rect_hot = CheckCollisionPointRec(GetMousePosition(), finish_rect);
 
     if (IsKeyPressed(KEY_D)) {
@@ -251,24 +270,52 @@ main(void)
 
     EdgeNode *start_pair = &edge_pairs[0];
     Vector2 query = start_pair->a1;
+#ifdef DEBUG
+    int stop = -1;
+    if (edge_pairs_len > 0) {
+    printf("* ");
+    for (EdgeNode *current_pair = start_pair;
+	 ;
+	 current_pair = current_pair->next) {
+      if (current_pair == start_pair) {
+	stop += 1;
+	if (stop == 1)
+	  break;
+      }
+      printf("{%.2f, %.2f: %.2f, %.2f} -> ", current_pair->a1.x, current_pair->a1.y,
+	     current_pair->b1.x, current_pair->b1.y);
+    }
+    printf("REPEAT \n");
+    }
+#endif
+
+    {
+    int current_group = 0;
     while (edge_pairs_len > 0) {
       for (EdgeNode *current_pair = start_pair->next;
 	   ;
 	   current_pair = current_pair->next) {
 	if (current_pair == start_pair) {
-	  push(query, manifold);
+	  Vector2Group group = {0};
+	  group.group = current_group;
+	  group.v = query;
+	  push(group, manifolds);
 	  (start_pair->prev)->next = start_pair->next;
 	  (start_pair->next)->prev = start_pair->prev;
 	  start_pair = current_pair->next;
 	  current_pair = start_pair->next;
 	  edge_pairs_len -= 1;
 	  query = current_pair->a1;
+	  current_group += 1;
 	  break;
 	}
 	int equal_a = Vector2Equals(query, current_pair->a1);
 	int equal_b = Vector2Equals(query, current_pair->b1);
 	if (equal_a || equal_b) {
-	  push(query, manifold);
+	  Vector2Group group = {0};
+	  group.group = current_group;
+	  group.v = query;
+	  push(group, manifolds);
 	  if (equal_a) {
 	    query = current_pair->b1;
 	  } else if (equal_b) {
@@ -280,6 +327,7 @@ main(void)
 	  edge_pairs_len -= 1;
 	}
       }
+    }
     }
 
     BeginDrawing();
@@ -299,8 +347,15 @@ main(void)
       }
     }
 
-    for (int i = 0; i < manifold_len; i++) {
-      DrawLineV(manifold[i], manifold[(i + 1) % manifold_len], ORANGE);
+    Vector2Group *current_group = &manifolds[0];
+    for (int i = 0; i < manifolds_len; i++) {
+      Vector2Group group = manifolds[i];
+      Vector2Group next_group = manifolds[(i + 1) % manifolds_len];
+      if (current_group->group != next_group.group) {
+	next_group = *current_group;
+	current_group = &manifolds[i + 1];
+      }
+      DrawLineV(group.v, next_group.v, RAINBOW[group.group % RAINBOW_cap]);
     }
 
     /* for (int i = 0; i < grid_deltas_len; i++) { */
